@@ -79,6 +79,22 @@ def init_db(default_owner_id=None):
     )
     ''')
     
+    # Vazifalar jadvali
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to TEXT NOT NULL,
+        assigned_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        deadline_hours INTEGER NOT NULL,
+        status TEXT DEFAULT 'Pending',
+        submitted_at TEXT,
+        submission_notes TEXT
+    )
+    ''')
+    
     # Boshlang'ich sozlamalar
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('ai_active', '1')")
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('ai_strict', '0')")
@@ -104,7 +120,7 @@ def init_db(default_owner_id=None):
         """)
         cursor.execute("""
         INSERT INTO employees (id, name, username, telegram_id, position, grade, department, manager, kpi, bonus, warnings, is_profile_complete, role, income, work_quality, badges, rating)
-        VALUES ('CTO-002', 'Javoxir To\'rayev', '@javoxir_cto', 22222222, 'CTO', 'G14', 'Engineering', 'CEO', 96, 1500, 0, 2, 'owner', 12000.0, 99, '["Zumrad"]', 42)
+        VALUES ('CTO-002', 'Javoxir To''rayev', '@javoxir_cto', 22222222, 'CTO', 'G14', 'Engineering', 'CEO', 96, 1500, 0, 2, 'owner', 12000.0, 99, '["Zumrad"]', 42)
         """)
         
     # Agar default owner telegram ID berilgan bo'lsa, uni owner qilib qo'yish yoki yangi qo'shish
@@ -305,3 +321,67 @@ def get_financial_stats():
         "total_income": row[1] or 0.0,
         "avg_quality": int(row[2]) if row[2] else 100
     }
+
+def add_task(title: str, description: str, assigned_to: str, assigned_by: str, deadline_hours: int):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    now = datetime.datetime.now().isoformat()
+    cursor.execute("""
+    INSERT INTO tasks (title, description, assigned_to, assigned_by, created_at, deadline_hours, status)
+    VALUES (?, ?, ?, ?, ?, ?, 'Pending')
+    """, (title, description, assigned_to, assigned_by, now, deadline_hours))
+    conn.commit()
+    conn.close()
+
+def get_tasks_for_user(username: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks WHERE assigned_to = ? OR assigned_to = 'all' ORDER BY id DESC", (username,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{
+        "id": r[0], "title": r[1], "description": r[2], "assigned_to": r[3],
+        "assigned_by": r[4], "created_at": r[5], "deadline_hours": r[6],
+        "status": r[7], "submitted_at": r[8], "submission_notes": r[9]
+    } for r in rows]
+
+def get_all_tasks():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{
+        "id": r[0], "title": r[1], "description": r[2], "assigned_to": r[3],
+        "assigned_by": r[4], "created_at": r[5], "deadline_hours": r[6],
+        "status": r[7], "submitted_at": r[8], "submission_notes": r[9]
+    } for r in rows]
+
+def get_task(task_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    r = cursor.fetchone()
+    conn.close()
+    if r:
+        return {
+            "id": r[0], "title": r[1], "description": r[2], "assigned_to": r[3],
+            "assigned_by": r[4], "created_at": r[5], "deadline_hours": r[6],
+            "status": r[7], "submitted_at": r[8], "submission_notes": r[9]
+        }
+    return None
+
+def submit_task(task_id: int, notes: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    now = datetime.datetime.now().isoformat()
+    cursor.execute("UPDATE tasks SET status = 'Submitted', submitted_at = ?, submission_notes = ? WHERE id = ?", (now, notes, task_id))
+    conn.commit()
+    conn.close()
+
+def update_task_status(task_id: int, status: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
+    conn.commit()
+    conn.close()
