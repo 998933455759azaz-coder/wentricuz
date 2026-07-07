@@ -52,32 +52,58 @@ done
 echo -e "\n${BLUE}[2/5] WCEMS Sozlamalarini kiritish...${NC}"
 
 # Telegram Bot Token
-while true; do
-    read -p "🔑 Telegram Bot Token-ni kiriting: " BOT_TOKEN
-    if [ -n "$BOT_TOKEN" ]; then
-        break
-    else
-        echo -e "${RED}Token bo'sh bo'lishi mumkin emas!${NC}"
-    fi
-done
+BOT_TOKEN=$1
+if [ -z "$BOT_TOKEN" ]; then
+    while true; do
+        read -p "🔑 Telegram Bot Token-ni kiriting: " BOT_TOKEN
+        if [ -n "$BOT_TOKEN" ]; then
+            break
+        else
+            echo -e "${RED}Token bo'sh bo'lishi mumkin emas!${NC}"
+        fi
+    done
+else
+    echo -e "🔑 Telegram Bot Token: ${GREEN}$BOT_TOKEN${NC}"
+fi
 
 # Owner Telegram ID
-while true; do
-    read -p "👤 Loyiha Egasi (Owner) Telegram ID-sini kiriting: " OWNER_ID
-    if [[ "$OWNER_ID" =~ ^[0-9]+$ ]]; then
-        break
-    else
-        echo -e "${RED}Telegram ID faqat raqamlardan iborat bo'lishi kerak!${NC}"
-    fi
-done
+OWNER_ID=$2
+if [ -z "$OWNER_ID" ]; then
+    while true; do
+        read -p "👤 Loyiha Egasi (Owner) Telegram ID-sini kiriting: " OWNER_ID
+        if [[ "$OWNER_ID" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            echo -e "${RED}Telegram ID faqat raqamlardan iborat bo'lishi kerak!${NC}"
+        fi
+    done
+else
+    echo -e "👤 Loyiha Egasi (Owner) Telegram ID: ${GREEN}$OWNER_ID${NC}"
+fi
 
 # Gemini API Key (Ixtiyoriy)
-read -p "🤖 Gemini API Key-ni kiriting (Ixtiyoriy, bosish enter): " GEMINI_KEY
+GEMINI_KEY=$3
+if [ -z "$GEMINI_KEY" ]; then
+    read -p "🤖 Gemini API Key-ni kiriting (Ixtiyoriy, bosish enter): " GEMINI_KEY
+else
+    echo -e "🤖 Gemini API Key: ${GREEN}$GEMINI_KEY${NC}"
+fi
 
 # Telegram API ID va HASH (Userbot uchun, ixtiyoriy)
-echo -e "${YELLOW}Telethon Userbot sozlamalari (Ixtiyoriy, keyinroq .env orqali kiritsa ham bo'ladi):${NC}"
-read -p "🔹 TELEGRAM_API_ID kiriting (Enter skipping): " API_ID
-read -p "🔹 TELEGRAM_API_HASH kiriting (Enter skipping): " API_HASH
+API_ID=$4
+if [ -z "$API_ID" ]; then
+    echo -e "${YELLOW}Telethon Userbot sozlamalari (Ixtiyoriy, keyinroq .env orqali kiritsa ham bo'ladi):${NC}"
+    read -p "🔹 TELEGRAM_API_ID kiriting (Enter skipping): " API_ID
+else
+    echo -e "🔹 TELEGRAM_API_ID: ${GREEN}$API_ID${NC}"
+fi
+
+API_HASH=$5
+if [ -z "$API_HASH" ]; then
+    read -p "🔹 TELEGRAM_API_HASH kiriting (Enter skipping): " API_HASH
+else
+    echo -e "🔹 TELEGRAM_API_HASH: ${GREEN}$API_HASH${NC}"
+fi
 
 # 4. .env faylini yaratish
 echo -e "\n${BLUE}[3/5] .env konfiguratsiya fayli shakllantirilmoqda...${NC}"
