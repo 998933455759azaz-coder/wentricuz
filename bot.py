@@ -208,6 +208,8 @@ async def handle_userbot_setup(message: Message, tg_id: int, state_info: dict, t
         client = state_info["client"]
         phone = state_info["phone"]
         phone_code_hash = state_info["phone_code_hash"]
+        api_id = state_info["api_id"]
+        api_hash = state_info["api_hash"]
         
         # Clean the code input (sometimes spaces are included)
         code = text.replace(" ", "").strip()
@@ -217,7 +219,7 @@ async def handle_userbot_setup(message: Message, tg_id: int, state_info: dict, t
             await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
             
             # Successful sign in
-            await complete_userbot_setup(message, tg_id, client)
+            await complete_userbot_setup(message, tg_id, client, api_id, api_hash)
             
         except SessionPasswordNeededError:
             # 2FA Password is required
@@ -232,19 +234,23 @@ async def handle_userbot_setup(message: Message, tg_id: int, state_info: dict, t
             
     elif step == "password":
         client = state_info["client"]
+        api_id = state_info["api_id"]
+        api_hash = state_info["api_hash"]
         try:
             await client.sign_in(password=text)
-            await complete_userbot_setup(message, tg_id, client)
+            await complete_userbot_setup(message, tg_id, client, api_id, api_hash)
         except Exception as e:
             await message.reply(f"❌ Parol noto'g'ri: {str(e)}\nIltimos, parolingizni qaytadan tekshirib kiriting:")
 
-async def complete_userbot_setup(message: Message, tg_id: int, client: TelegramClient):
+async def complete_userbot_setup(message: Message, tg_id: int, client: TelegramClient, api_id: int, api_hash: str):
     # Store globally
     active_userbots[tg_id] = client
     userbot_states.pop(tg_id, None)
     
-    # Write to .env for persistence
-    # Note: Telethon writes a physical .session file, so next time it is already authenticated!
+    # Store credentials in DB config for startup auto-restoration
+    db.set_config(f"userbot_api_id_{tg_id}", str(api_id))
+    db.set_config(f"userbot_api_hash_{tg_id}", api_hash)
+    
     await message.reply(
         "🎉 <b>TABRIKLAYMIZ! USERBOT MUVAFFAQIYATLI ULANDI!</b>\n\n"
         "Sizning shaxsiy Telegram profilingiz endi Wentric tizimiga xizmat qiladi. "
@@ -1048,6 +1054,34 @@ async def handle_group_message(message: Message):
 
 async def main():
     print("Wentric Advanced Corporate Bot is launching...")
+    
+    # Restore saved userbot sessions
+    try:
+        userbots_to_restore = db.get_userbot_configs()
+        if userbots_to_restore:
+            print(f"Restoring {len(userbots_to_restore)} saved userbot sessions...")
+            for config in userbots_to_restore:
+                tg_id = config["tg_id"]
+                api_id = config["api_id"]
+                api_hash = config["api_hash"]
+                session_path = f"userbot_session_{tg_id}"
+                
+                try:
+                    print(f"Connecting userbot for {tg_id}...")
+                    client = TelegramClient(session_path, api_id, api_hash)
+                    await client.connect()
+                    
+                    if await client.is_user_authorized():
+                        active_userbots[tg_id] = client
+                        await launch_userbot_listeners(tg_id, client)
+                        print(f"✓ Userbot {tg_id} successfully reconnected and listening!")
+                    else:
+                        print(f"⚠ Userbot {tg_id} session is not authorized. Skipping.")
+                except Exception as inner_e:
+                    print(f"Error restoring userbot {tg_id}: {inner_e}")
+    except Exception as e:
+        print(f"Error reading userbot configs: {e}")
+        
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

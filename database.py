@@ -251,32 +251,45 @@ def log_message(username: str, name: str, message: str):
     conn.commit()
     conn.close()
 
-def add_warning(username: str, reason: str, issuer: str):
+def add_warning(username_or_id: str, reason: str, issuer: str):
+    emp = get_employee(username_or_id)
+    if not emp:
+        return 0
+    telegram_id = emp["telegram_id"]
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE employees SET warnings = warnings + 1 WHERE username = ?", (username,))
-    cursor.execute("SELECT warnings FROM employees WHERE username = ?", (username,))
+    cursor.execute("UPDATE employees SET warnings = warnings + 1 WHERE telegram_id = ?", (telegram_id,))
+    cursor.execute("SELECT warnings FROM employees WHERE telegram_id = ?", (telegram_id,))
     row = cursor.fetchone()
     warnings = row[0] if row else 0
     
     now = datetime.datetime.now().isoformat()
     cursor.execute("INSERT INTO warning_logs (timestamp, username, reason, level, issuer) VALUES (?, ?, ?, ?, ?)",
-                   (now, username, reason, warnings, issuer))
+                   (now, emp["username"], reason, warnings, issuer))
     conn.commit()
     conn.close()
     return warnings
 
-def update_kpi(username: str, change: int):
+def update_kpi(username_or_id: str, change: int):
+    emp = get_employee(username_or_id)
+    if not emp:
+        return
+    telegram_id = emp["telegram_id"]
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE employees SET kpi = MAX(0, MIN(100, kpi + ?)) WHERE username = ?", (change, username))
+    cursor.execute("UPDATE employees SET kpi = MAX(0, MIN(100, kpi + ?)) WHERE telegram_id = ?", (change, telegram_id))
     conn.commit()
     conn.close()
 
-def adjust_rating_and_badges(username: str, rating_change: int):
+def adjust_rating_and_badges(username_or_id: str, rating_change: int):
+    emp = get_employee(username_or_id)
+    if not emp:
+        return None
+    telegram_id = emp["telegram_id"]
+    
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT rating, badges FROM employees WHERE username = ?", (username,))
+    cursor.execute("SELECT rating, badges FROM employees WHERE telegram_id = ?", (telegram_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -304,8 +317,8 @@ def adjust_rating_and_badges(username: str, rating_change: int):
         if b not in new_badges:
             new_badges.append(b)
             
-    cursor.execute("UPDATE employees SET rating = ?, badges = ? WHERE username = ?", 
-                   (new_rating, json.dumps(new_badges), username))
+    cursor.execute("UPDATE employees SET rating = ?, badges = ? WHERE telegram_id = ?", 
+                   (new_rating, json.dumps(new_badges), telegram_id))
     conn.commit()
     conn.close()
     return {"rating": new_rating, "badges": new_badges}
@@ -385,3 +398,24 @@ def update_task_status(task_id: int, status: str):
     cursor.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
     conn.commit()
     conn.close()
+
+def get_userbot_configs():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM config WHERE key LIKE 'userbot_api_id_%'")
+    rows = cursor.fetchall()
+    configs = []
+    for r in rows:
+        tg_id_str = r[0].replace("userbot_api_id_", "")
+        try:
+            tg_id = int(tg_id_str)
+            api_id = int(r[1])
+            cursor.execute("SELECT value FROM config WHERE key = ?", (f"userbot_api_hash_{tg_id}",))
+            hash_row = cursor.fetchone()
+            api_hash = hash_row[0] if hash_row else None
+            if api_hash:
+                configs.append({"tg_id": tg_id, "api_id": api_id, "api_hash": api_hash})
+        except Exception:
+            continue
+    conn.close()
+    return configs
