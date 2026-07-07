@@ -1,0 +1,6 @@
+{
+  "name": "Wentric Employee Management System",
+  "description": "Wentric Corporation Employee Management System (WCEMS) v1.0 - Interactive Enterprise Dashboard, Telegram Bot Simulator, and Code Exporter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
